@@ -1,76 +1,34 @@
-import React, {
-  useContext,
-  useEffect,
-  useState,
-  useRef,
-  useCallback,
-  memo,
-} from "react";
+import React, { useContext, useEffect, memo } from "react";
 import Sidebar from "./components/Sidebar";
 import Player from "./components/Player";
 import Display from "./components/Display";
+import NowPlaying from "./components/NowPlaying";
 import { PlayerContext } from "./context/PlayerContext";
 
 const App = () => {
   const { audioRef, track } = useContext(PlayerContext);
 
-  // Render guards & layout watchers
-  const [isMounted, setIsMounted] = useState(false);
-  const layoutRef = useRef(null);
-
-  // Gives smoother layout activation
-  useEffect(() => {
-    const timer = setTimeout(() => setIsMounted(true), 40);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Auto-update audio source with safe load
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-
-    try {
-      audio.src = track.file;
-      audio.load();
-    } catch (e) {
-      /* silently protect render */
-    }
+    audio.src = track.file;
+    audio.load();
   }, [track, audioRef]);
 
-  // Broadcast layout updates (future-proofing)
-  const observeLayout = useCallback(() => {
-    if (!layoutRef.current) return;
-
-    const observer = new ResizeObserver(() => {
-      /* Keep flexible spacing while minimising layout shifts */
-    });
-
-    observer.observe(layoutRef.current);
-
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const cleanup = observeLayout();
-    return cleanup;
-  }, [observeLayout]);
-
-  // Keybinds (global shortcuts: space = play/pause, arrows = seek)
+  // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e) => {
       if (!audioRef.current) return;
       const audio = audioRef.current;
 
-      if (e.code === "Space") {
+      if (e.code === "Space" && e.target.tagName !== "INPUT" && e.target.tagName !== "BUTTON") {
         e.preventDefault();
         audio.paused ? audio.play() : audio.pause();
       }
-
-      if (e.code === "ArrowRight") {
+      if (e.code === "ArrowRight" && e.altKey) {
         audio.currentTime = Math.min(audio.duration, audio.currentTime + 5);
       }
-
-      if (e.code === "ArrowLeft") {
+      if (e.code === "ArrowLeft" && e.altKey) {
         audio.currentTime = Math.max(0, audio.currentTime - 5);
       }
     };
@@ -79,34 +37,31 @@ const App = () => {
     return () => window.removeEventListener("keydown", handler);
   }, [audioRef]);
 
-  // Layout class generator
-  const layoutClass = isMounted
-    ? "h-screen bg-black transition-opacity duration-300 opacity-100"
-    : "h-screen bg-black opacity-0";
-
   return (
-    <div className={layoutClass} ref={layoutRef}>
-      {/* Main zone */}
-      <div className="h-[90%] flex overflow-hidden">
-        <Sidebar />
+    <div className="h-screen bg-black flex flex-col overflow-hidden">
+      {/* Main 3-panel area */}
+      <div className="flex-1 flex gap-2 p-2 overflow-hidden">
+        {/* Left Sidebar - hidden on mobile */}
+        <div className="hidden lg:block flex-shrink-0">
+          <Sidebar />
+        </div>
+
+        {/* Center: Main View */}
         <Display />
+
+        {/* Right: Now Playing View - hidden on medium and below */}
+        <div className="hidden xl:block flex-shrink-0">
+          <NowPlaying />
+        </div>
       </div>
 
-      {/* Bottom player */}
+      {/* Bottom Player Bar */}
       <Player />
 
-      {/* Audio element (same ID, same structure) */}
-      <audio
-        ref={audioRef}
-        src={track.file}
-        preload="auto"
-        onError={() => {
-          /* Soft fallback, avoids crashes */
-        }}
-      ></audio>
+      {/* Hidden audio element */}
+      <audio ref={audioRef} src={track.file} preload="auto" />
     </div>
   );
 };
 
-// Future optimization: memoized export
 export default memo(App);

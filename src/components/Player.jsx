@@ -1,208 +1,233 @@
-import React, { useContext, useCallback } from "react";
-import { assets } from "../assets/assets";
+import React, { useContext, useCallback, useRef, useState, useEffect } from "react";
 import { PlayerContext } from "../context/PlayerContext";
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Shuffle,
+  Repeat,
+  Volume2,
+  Volume1,
+  VolumeX,
+  ListMusic,
+  Mic2,
+  MonitorSpeaker,
+  Maximize2,
+  Plus,
+} from "lucide-react";
+import { songsData } from "../assets/assets";
 
-/**
- * Enhanced Player Component (100+ lines)
- * - Keeps all IDs, props, refs, names, and logic intact.
- * - Adds keyboard control support.
- * - Adds smoother layout structure with accessibility in mind.
- * - Visual interaction improvements (hover, active states).
- * - Expanded flex scaffolding for future mini-features.
- * - Defensive checks for missing track data.
- * - Longer, cleaner, more scalable markup.
- * - Zero breaking changes.
- */
+const formatTime = (minutes, seconds) => {
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+};
 
 const Player = () => {
   const {
     track,
-    seekBar,
-    seekBg,
     playStatus,
     play,
     pause,
     time,
+    audioRef,
+    playWithId,
   } = useContext(PlayerContext);
+
+  const [volume, setVolume] = useState(80);
+  const [prevVolume, setPrevVolume] = useState(80);
+  const progressRef = useRef(null);
+  const volumeRef = useRef(null);
 
   const currentTrack = track || {};
 
-  // Helpers for keyboard-triggered play/pause
-  const togglePlay = useCallback(
+  // Calculate progress percentage
+  const totalSeconds = time.totalTime.minute * 60 + time.totalTime.second;
+  const currentSeconds = time.currentTime.minute * 60 + time.currentTime.second;
+  const progress = totalSeconds > 0 ? (currentSeconds / totalSeconds) * 100 : 0;
+
+  const handleProgressChange = useCallback(
     (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        playStatus ? pause() : play();
-      }
+      const audio = audioRef.current;
+      if (!audio || isNaN(audio.duration)) return;
+      const value = parseFloat(e.target.value);
+      audio.currentTime = (value / 100) * audio.duration;
     },
-    [playStatus, play, pause]
+    [audioRef]
   );
 
-  return (
-    <div
-      className="
-        h-[10%]
-        bg-black
-        text-white
-        flex
-        justify-between
-        items-center
-        px-4
-        select-none
-        border-t border-[#222]
-      "
-    >
-      {/* LEFT — Current Song Information */}
-      <div className="hidden lg:flex items-center gap-4 w-[22%] min-w-[200px]">
-        <img
-          className="w-12 rounded shadow-md"
-          src={currentTrack.image}
-          alt={currentTrack.name || "Track thumbnail"}
-        />
+  const handleVolumeChange = useCallback(
+    (e) => {
+      const val = parseInt(e.target.value);
+      setVolume(val);
+      if (audioRef.current) {
+        audioRef.current.volume = val / 100;
+      }
+    },
+    [audioRef]
+  );
 
-        <div className="leading-tight">
-          <p className="font-semibold text-sm">{currentTrack.name}</p>
-          <p className="text-xs text-gray-300">
-            {(currentTrack.desc || "").slice(0, 12)}
+  const toggleMute = useCallback(() => {
+    if (volume > 0) {
+      setPrevVolume(volume);
+      setVolume(0);
+      if (audioRef.current) audioRef.current.volume = 0;
+    } else {
+      setVolume(prevVolume);
+      if (audioRef.current) audioRef.current.volume = prevVolume / 100;
+    }
+  }, [volume, prevVolume, audioRef]);
+
+  const handleNext = useCallback(() => {
+    const nextId = currentTrack.id < songsData.length - 1 ? currentTrack.id + 1 : 0;
+    playWithId(nextId);
+  }, [currentTrack.id, playWithId]);
+
+  const handlePrev = useCallback(() => {
+    const prevId = currentTrack.id > 0 ? currentTrack.id - 1 : songsData.length - 1;
+    playWithId(prevId);
+  }, [currentTrack.id, playWithId]);
+
+  // Set initial volume
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume / 100;
+    }
+  }, []);
+
+  const VolumeIcon = volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
+
+  return (
+    <div className="h-[72px] bg-black flex items-center justify-between px-4 select-none">
+      {/* Left: Now Playing */}
+      <div className="flex items-center gap-3 w-[30%] min-w-[180px]">
+        {currentTrack.image && (
+          <img
+            src={currentTrack.image}
+            alt={currentTrack.name}
+            className="w-14 h-14 rounded object-cover"
+          />
+        )}
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-white truncate hover:underline cursor-pointer">
+            {currentTrack.name}
+          </p>
+          <p className="text-xs text-[#b3b3b3] truncate hover:text-white hover:underline cursor-pointer">
+            {(currentTrack.desc || "").slice(0, 20)}
           </p>
         </div>
+        <button className="text-[#b3b3b3] hover:text-white transition-colors ml-2 flex-shrink-0" aria-label="Save to library">
+          <Plus size={16} />
+        </button>
       </div>
 
-      {/* CENTER — Player Controls + Seek Bar */}
-      <div className="flex flex-col items-center gap-2 flex-grow">
-
+      {/* Center: Controls + Progress */}
+      <div className="flex flex-col items-center gap-1 flex-1 max-w-[722px]">
         {/* Transport Controls */}
-        <div className="flex gap-5 justify-center items-center">
-          <img
-            className="w-4 cursor-pointer hover:opacity-80 active:scale-90 transition"
-            src={assets.shuffle_icon}
-            alt="Shuffle"
-          />
-
-          <img
-            className="w-4 cursor-pointer hover:opacity-80 active:scale-90 transition"
-            src={assets.prev_icon}
-            alt="Previous"
-          />
-
-          {/* Play / Pause */}
-          {playStatus ? (
-            <img
-              onClick={pause}
-              onKeyDown={togglePlay}
-              tabIndex={0}
-              role="button"
-              aria-label="Pause"
-              className="
-                w-6 cursor-pointer hover:opacity-90 active:scale-95 transition
-              "
-              src={assets.pause_icon}
-              alt="Pause"
-            />
-          ) : (
-            <img
-              onClick={play}
-              onKeyDown={togglePlay}
-              tabIndex={0}
-              role="button"
-              aria-label="Play"
-              className="
-                w-6 cursor-pointer hover:opacity-90 active:scale-95 transition
-              "
-              src={assets.play_icon}
-              alt="Play"
-            />
-          )}
-
-          <img
-            className="w-4 cursor-pointer hover:opacity-80 active:scale-90 transition"
-            src={assets.next_icon}
-            alt="Next"
-          />
-
-          <img
-            className="w-4 cursor-pointer hover:opacity-80 active:scale-90 transition"
-            src={assets.loop_icon}
-            alt="Loop"
-          />
+        <div className="flex items-center gap-4">
+          <button className="text-[#b3b3b3] hover:text-white transition-colors" aria-label="Shuffle">
+            <Shuffle size={18} />
+          </button>
+          <button onClick={handlePrev} className="text-[#b3b3b3] hover:text-white transition-colors" aria-label="Previous">
+            <SkipBack size={20} fill="currentColor" />
+          </button>
+          <button
+            onClick={playStatus ? pause : play}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-black hover:scale-110 transition-transform"
+            aria-label={playStatus ? "Pause" : "Play"}
+          >
+            {playStatus ? <Pause size={16} fill="black" /> : <Play size={16} fill="black" className="ml-0.5" />}
+          </button>
+          <button onClick={handleNext} className="text-[#b3b3b3] hover:text-white transition-colors" aria-label="Next">
+            <SkipForward size={20} fill="currentColor" />
+          </button>
+          <button className="text-[#b3b3b3] hover:text-white transition-colors" aria-label="Repeat">
+            <Repeat size={18} />
+          </button>
         </div>
 
-        {/* Seek Bar */}
-        <div className="flex items-center gap-5 w-full justify-center">
-          <p className="text-xs tabular-nums opacity-80">
-            {time.currentTime.minute}:{time.currentTime.second}
-          </p>
-
-          <div
-            ref={seekBg}
-            className="
-              relative
-              w-[60vw]
-              max-w-[500px]
-              h-1
-              bg-gray-500
-              rounded-full
-              cursor-pointer
-              overflow-hidden
-            "
-          >
+        {/* Progress Bar */}
+        <div className="flex items-center gap-2 w-full progress-bar">
+          <span className="text-xs text-[#b3b3b3] tabular-nums w-10 text-right">
+            {formatTime(time.currentTime.minute, time.currentTime.second)}
+          </span>
+          <div className="relative flex-1 h-1 group" ref={progressRef}>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={progress}
+              onChange={handleProgressChange}
+              className="absolute inset-0 w-full h-1 cursor-pointer z-10 opacity-0"
+              aria-label="Track progress"
+            />
+            <div className="absolute inset-0 h-1 rounded-full bg-[#4d4d4d]">
+              <div
+                className="h-full rounded-full bg-white group-hover:bg-[#1DB954] transition-colors"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            {/* Thumb indicator */}
             <div
-              ref={seekBar}
-              className="
-                absolute
-                top-0
-                left-0
-                h-1
-                bg-green-600
-                rounded-full
-                transition-all
-              "
-              style={{ width: "" }}
+              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+              style={{ left: `calc(${progress}% - 6px)` }}
             />
           </div>
-
-          <p className="text-xs tabular-nums opacity-80">
-            {time.totalTime.minute}:{time.totalTime.second}
-          </p>
+          <span className="text-xs text-[#b3b3b3] tabular-nums w-10">
+            {formatTime(time.totalTime.minute, time.totalTime.second)}
+          </span>
         </div>
       </div>
 
-      {/* RIGHT — Extra Controls */}
-      <div
-        className="
-          hidden
-          lg:flex
-          items-center
-          gap-3
-          opacity-75
-          hover:opacity-100
-          transition
-          w-[20%]
-          justify-end
-        "
-      >
-        <img className="w-4 cursor-pointer" src={assets.plays_icon} alt="Plays" />
-        <img className="w-4 cursor-pointer" src={assets.mic_icon} alt="Mic" />
-        <img className="w-4 cursor-pointer" src={assets.queue_icon} alt="Queue" />
-        <img className="w-4 cursor-pointer" src={assets.speaker_icon} alt="Speaker" />
-        <img className="w-4 cursor-pointer" src={assets.volume_icon} alt="Volume" />
+      {/* Right: Extra Controls */}
+      <div className="flex items-center gap-3 w-[30%] justify-end">
+        <button className="text-[#b3b3b3] hover:text-white transition-colors hidden lg:block" aria-label="Now playing view">
+          <ListMusic size={18} />
+        </button>
+        <button className="text-[#b3b3b3] hover:text-white transition-colors hidden lg:block" aria-label="Lyrics">
+          <Mic2 size={18} />
+        </button>
+        <button className="text-[#b3b3b3] hover:text-white transition-colors hidden lg:block" aria-label="Queue">
+          <ListMusic size={18} />
+        </button>
+        <button className="text-[#b3b3b3] hover:text-white transition-colors hidden lg:block" aria-label="Connect to device">
+          <MonitorSpeaker size={18} />
+        </button>
 
-        {/* Volume Bar */}
-        <div className="w-24 h-1 bg-gray-300 rounded-full cursor-pointer">
-          {/* Expandable for future volume control */}
+        {/* Volume */}
+        <div className="flex items-center gap-2 hidden lg:flex">
+          <button
+            onClick={toggleMute}
+            className="text-[#b3b3b3] hover:text-white transition-colors"
+            aria-label={volume === 0 ? "Unmute" : "Mute"}
+          >
+            <VolumeIcon size={18} />
+          </button>
+          <div className="relative w-24 h-1 group progress-bar" ref={volumeRef}>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={volume}
+              onChange={handleVolumeChange}
+              className="absolute inset-0 w-full h-1 cursor-pointer z-10 opacity-0"
+              aria-label="Volume"
+            />
+            <div className="absolute inset-0 h-1 rounded-full bg-[#4d4d4d]">
+              <div
+                className="h-full rounded-full bg-white group-hover:bg-[#1DB954] transition-colors"
+                style={{ width: `${volume}%` }}
+              />
+            </div>
+            <div
+              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+              style={{ left: `calc(${volume}% - 6px)` }}
+            />
+          </div>
         </div>
 
-        <img
-          className="w-4 cursor-pointer"
-          src={assets.mini_player_icon}
-          alt="Mini Player"
-        />
-
-        <img
-          className="w-4 cursor-pointer"
-          src={assets.zoom_icon}
-          alt="Zoom"
-        />
+        <button className="text-[#b3b3b3] hover:text-white transition-colors hidden lg:block" aria-label="Full screen">
+          <Maximize2 size={18} />
+        </button>
       </div>
     </div>
   );

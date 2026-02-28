@@ -1,157 +1,42 @@
-import React, { useContext, useState, useRef } from "react";
+import React, { useContext } from "react";
 import { PlayerContext } from "../context/PlayerContext";
+import { Play } from "lucide-react";
 
-// Enhanced SongItem component with richer UI feedback, animations,
-// lazy-loading, accessible labels, and better performance handling.
 const SongItem = ({ name, image, desc, id }) => {
   const { playWithId } = useContext(PlayerContext);
 
-  // Local UI states
-  const [isHover, setIsHover] = useState(false);
-  const [imgLoaded, setImgLoaded] = useState(false);
-  const [pressed, setPressed] = useState(false);
-
-  const itemRef = useRef(null);
-
-  const handlePlay = () => {
-    // small ripple-style feedback animation
-    setPressed(true);
-    setTimeout(() => setPressed(false), 120);
-
-    // maintain original behaviour
-    playWithId(id);
-  };
-
   return (
     <div
-      ref={itemRef}
-      onClick={handlePlay}
-      onMouseEnter={() => setIsHover(true)}
-      onMouseLeave={() => setIsHover(false)}
-      className="
-        min-w-[180px]
-        p-2
-        px-3
-        rounded
-        cursor-pointer
-        transition-all
-        duration-200
-        relative
-        overflow-hidden
-        group
-        select-none
-        hover:bg-[#ffffff26]
-      "
-      style={{
-        transform: pressed ? "scale(0.96)" : "scale(1)",
-        boxShadow: isHover ? "0 4px 14px rgba(0,0,0,0.3)" : "none",
-      }}
-      aria-label={`Play ${name}`}
+      onClick={() => playWithId(id)}
+      className="p-3 rounded-md bg-[#181818] hover:bg-[#282828] transition-all duration-300 cursor-pointer group"
       role="button"
       tabIndex={0}
+      aria-label={`Play ${name}`}
     >
-
-      {/* Image container with fade-in, skeleton, and hover zoom */}
-      <div className="w-full h-[180px] overflow-hidden rounded relative">
-        {/* Skeleton loader */}
-        {!imgLoaded && (
-          <div className="absolute inset-0 bg-[#333] animate-pulse rounded" />
-        )}
-
+      {/* Cover Art with Play Button */}
+      <div className="relative mb-4">
         <img
-          className={`
-            rounded
-            w-full
-            h-full
-            object-cover
-            transition-all
-            duration-300
-            ${isHover ? "scale-110" : "scale-100"}
-            ${imgLoaded ? "opacity-100" : "opacity-0"}
-          `}
           src={image}
           alt={`${name} cover art`}
+          className="w-full aspect-square object-cover rounded-md shadow-lg"
           loading="lazy"
-          onLoad={() => setImgLoaded(true)}
         />
-
-        {/* Play pulse effect on hover */}
-        {isHover && (
-          <div
-            className="
-              absolute
-              inset-0
-              bg-black/40
-              flex
-              items-center
-              justify-center
-              transition
-              duration-200
-            "
-          >
-            <div
-              className="
-                w-10
-                h-10
-                bg-green-500
-                rounded-full
-                flex
-                items-center
-                justify-center
-                text-black
-                font-bold
-                text-lg
-                opacity-90
-                shadow-xl
-                group-hover:scale-110
-                transition-transform
-                duration-200
-              "
-            >
-              ▶
-            </div>
-          </div>
-        )}
+        {/* Green Play Button - slides up on hover */}
+        <button
+          className="absolute bottom-2 right-2 w-12 h-12 rounded-full bg-[#1DB954] flex items-center justify-center shadow-xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 hover:scale-105 hover:bg-[#1ed760]"
+          aria-label={`Play ${name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            playWithId(id);
+          }}
+        >
+          <Play size={20} fill="black" stroke="black" />
+        </button>
       </div>
 
-      {/* Song name */}
-      <p
-        className="
-          font-bold
-          mt-2
-          mb-1
-          text-white
-          truncate
-          transition-all
-          duration-200
-        "
-        title={name}
-      >
-        {name}
-      </p>
-
-      {/* Description */}
-      <p
-        className="
-          text-slate-300
-          text-sm
-          leading-tight
-          line-clamp-2
-        "
-        title={desc}
-      >
-        {desc}
-      </p>
-
-      {/* Focus ring for keyboard navigation */}
-      <style>
-        {`
-          div:focus {
-            outline: 2px solid #1db954;
-            outline-offset: 4px;
-          }
-        `}
-      </style>
+      {/* Text */}
+      <p className="font-bold text-sm text-white truncate">{name}</p>
+      <p className="text-xs text-[#b3b3b3] mt-1 line-clamp-2 leading-relaxed">{desc}</p>
     </div>
   );
 };
